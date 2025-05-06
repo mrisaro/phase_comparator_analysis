@@ -8,4 +8,5 @@
  ## Examples on how to use.
 
  auxiliary.py: file containing the functions for loading data and later data analysis.
+ 
  main_pc.py: main file where I show how to use the functions.
