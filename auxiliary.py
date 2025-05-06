@@ -13,6 +13,7 @@ import matplotlib.dates as mdates
 import allantools
 from datetime import datetime, timedelta
 
+# ------------------- Load files and data ------------------- #
 
 def load_pc_data(folder_path, start_date_str, end_date_str, channels, nominal_freq=100e6):
     """
@@ -74,6 +75,30 @@ def load_pc_data(folder_path, start_date_str, end_date_str, channels, nominal_fr
 
     return df_phase, df_freq
 
+# ------------------- Plot raw data in phase ------------------- #
+
+def plot_raw_phase(df_phase, channels, name):
+    """
+    Plot raw phase data of all channels before filtering.
+
+    Parameters:
+    - df_phase: DataFrame with phase data
+    - channels: list of channel numbers
+    """
+    plt.figure(figsize=(10,6), num=name)
+    for channel in channels:
+        phase_ps = df_phase[f'Ch_{channel}'].to_numpy() * 1e12  # convert to picoseconds
+        plt.plot(df_phase['Time'], phase_ps, label=f'Ch {channel}')
+    
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('Phase (ps)', fontsize=12)
+    plt.title('Raw Phase Data (Before Filtering)', fontsize=14)
+    plt.grid(True, linestyle='--')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+# ------------------- Plot phase data and stability ------------------- #
 
 def plot_phase_and_allan(df_phase, channels, sample_rate=1.0):
     fig, axs = plt.subplots(2,1,figsize=(10,8), num='phase + allan')
@@ -107,6 +132,8 @@ def plot_phase_and_allan(df_phase, channels, sample_rate=1.0):
     plt.show()
 
     return allan_results
+
+# ------------------- Plot freq data and stability ------------------- #
 
 def plot_frequency_and_allan(df_freq, channels, sample_rate=1.0, offsets=None):
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), num='frequency + allan')
@@ -160,3 +187,31 @@ def data_start_time(df, t_start):
     - Filtered DataFrame
     """
     return df[df['Time'] >= t_start].reset_index(drop=True)
+
+# ------------------- Glitches detection ------------------- #
+
+def remove_glitches(df, column, window_size=50, threshold=5):
+    """
+    Remove glitches and return cleaned data + mask.
+
+    Parameters:
+    - df: DataFrame
+    - column: column name
+    - window_size: rolling window size
+    - threshold: std multiplier
+
+    Returns:
+    - cleaned_series: numpy array (glitches interpolated)
+    - mask: boolean numpy array (True = valid, False = glitch)
+    """
+    series = df[column]
+    rolling_median = series.rolling(window=window_size, center=True).median()
+    rolling_std = series.rolling(window=window_size, center=True).std()
+
+    mask = np.abs(series - rolling_median) < threshold * rolling_std
+
+    cleaned_series = series.copy()
+    cleaned_series[~mask] = np.nan
+    cleaned_series = cleaned_series.interpolate()
+
+    return cleaned_series.values, mask.values
